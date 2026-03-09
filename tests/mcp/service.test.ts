@@ -1,17 +1,21 @@
 import { describe, expect, test, vi } from 'vitest';
 
 import { createDesktopControlService } from '../../src/mcp/service.js';
-import type { PointerDriver } from '../../src/macos/native-driver.js';
 
 describe('createDesktopControlService', () => {
-  test('captures screenshots with a prepared runtime and configured bounds', async () => {
-    const prepareNativeDriverRuntime = vi.fn(() =>
-      Promise.resolve({
+  test('refreshes runtime metadata for each screenshot capture', async () => {
+    const prepareNativeDriverRuntime = vi
+      .fn()
+      .mockResolvedValueOnce({
         binaryPath: '/tmp/mac-agent-driver',
         displayHeight: 900,
         displayWidth: 1440,
-      }),
-    );
+      })
+      .mockResolvedValueOnce({
+        binaryPath: '/tmp/mac-agent-driver',
+        displayHeight: 1080,
+        displayWidth: 1728,
+      });
     const captureFullScreen = vi.fn(() =>
       Promise.resolve({
         displayHeight: 900,
@@ -40,13 +44,18 @@ describe('createDesktopControlService', () => {
       },
     );
 
-    const result = await service.captureScreen({
+    const firstResult = await service.captureScreen({
+      visionBounds: { maxHeight: 900, maxWidth: 1440 },
+    });
+    const secondResult = await service.captureScreen({
       visionBounds: { maxHeight: 900, maxWidth: 1440 },
     });
 
-    expect(result.filePath).toBe('/tmp/screenshot.png');
-    expect(prepareNativeDriverRuntime).toHaveBeenCalledTimes(1);
-    expect(captureFullScreen).toHaveBeenCalledWith(
+    expect(firstResult.filePath).toBe('/tmp/screenshot.png');
+    expect(secondResult.filePath).toBe('/tmp/screenshot.png');
+    expect(prepareNativeDriverRuntime).toHaveBeenCalledTimes(2);
+    expect(captureFullScreen).toHaveBeenNthCalledWith(
+      1,
       expect.stringContaining('/tmp/mac-agent-mcp/screenshots/'),
       {
         runtime: {
@@ -60,29 +69,57 @@ describe('createDesktopControlService', () => {
         },
       },
     );
+    expect(captureFullScreen).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('/tmp/mac-agent-mcp/screenshots/'),
+      {
+        runtime: {
+          binaryPath: '/tmp/mac-agent-driver',
+          displayHeight: 1080,
+          displayWidth: 1728,
+        },
+        visionBounds: {
+          maxHeight: 900,
+          maxWidth: 1440,
+        },
+      },
+    );
   });
 
-  test('reuses the prepared pointer runtime when executing actions', async () => {
+  test('refreshes runtime metadata for each action execution', async () => {
     const click = vi.fn(() => Promise.resolve());
     const doubleClick = vi.fn(() => Promise.resolve());
     const drag = vi.fn(() => Promise.resolve());
     const move = vi.fn(() => Promise.resolve());
     const scroll = vi.fn(() => Promise.resolve());
-    const pointer: PointerDriver = {
-      click,
-      doubleClick,
-      drag,
-      move,
-      scroll,
-    };
-    const createNativePointerDriver = vi.fn(() => pointer);
-    const prepareNativeDriverRuntime = vi.fn(() =>
-      Promise.resolve({
+    const createNativePointerDriver = vi
+      .fn()
+      .mockReturnValueOnce({
+        click,
+        doubleClick,
+        drag,
+        move,
+        scroll,
+      })
+      .mockReturnValueOnce({
+        click,
+        doubleClick,
+        drag,
+        move,
+        scroll,
+      });
+    const prepareNativeDriverRuntime = vi
+      .fn()
+      .mockResolvedValueOnce({
         binaryPath: '/tmp/mac-agent-driver',
         displayHeight: 900,
         displayWidth: 1440,
-      }),
-    );
+      })
+      .mockResolvedValueOnce({
+        binaryPath: '/tmp/mac-agent-driver',
+        displayHeight: 1080,
+        displayWidth: 1728,
+      });
 
     const service = createDesktopControlService(
       {},
@@ -120,8 +157,17 @@ describe('createDesktopControlService', () => {
       },
     });
 
-    expect(prepareNativeDriverRuntime).toHaveBeenCalledTimes(1);
-    expect(createNativePointerDriver).toHaveBeenCalledTimes(1);
+    expect(prepareNativeDriverRuntime).toHaveBeenCalledTimes(2);
+    expect(createNativePointerDriver).toHaveBeenNthCalledWith(1, {
+      binaryPath: '/tmp/mac-agent-driver',
+      displayHeight: 900,
+      displayWidth: 1440,
+    });
+    expect(createNativePointerDriver).toHaveBeenNthCalledWith(2, {
+      binaryPath: '/tmp/mac-agent-driver',
+      displayHeight: 1080,
+      displayWidth: 1728,
+    });
     expect(click).toHaveBeenCalledWith({ x: 200, y: 100 }, 'left');
     expect(move).toHaveBeenCalledWith({ x: 100, y: 50 });
   });
