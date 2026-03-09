@@ -1,5 +1,11 @@
-import { mkdir, readFile, stat } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import {
+  mkdir,
+  readFile as readFileNode,
+  rename,
+  stat,
+  unlink,
+} from 'node:fs/promises';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { MacAgentError } from '../core/errors.js';
@@ -15,8 +21,10 @@ export interface DisplayPoint {
 }
 
 export interface ScreenCaptureResult extends ScreenshotGeometry {
-  imageBase64: string;
   filePath: string;
+  imageBase64: string;
+  sourceHeight?: number;
+  sourceWidth?: number;
 }
 
 export interface PointerDriver {
@@ -27,7 +35,28 @@ export interface PointerDriver {
   scroll(point: DisplayPoint, delta: { x: number; y: number }): Promise<void>;
 }
 
-type ScreenshotMetadata = ScreenshotGeometry;
+export interface PreparedNativeDriverRuntime {
+  binaryPath: string;
+  displayHeight: number;
+  displayWidth: number;
+}
+
+export interface VisionBounds {
+  maxHeight: number;
+  maxWidth: number;
+}
+
+interface Size {
+  height: number;
+  width: number;
+}
+
+interface NativeDriverDeps {
+  buildBinary(force?: boolean): Promise<string>;
+  readFile(path: string): Promise<Buffer>;
+  runBinary(binaryPath: string, args: string[]): Promise<string>;
+  runProcess(command: string, args: string[]): Promise<string>;
+}
 
 function getPackageRoot(): string {
   return fileURLToPath(new URL('../../', import.meta.url));
@@ -80,16 +109,6 @@ export async function buildNativeDriver(force = false): Promise<string> {
   return binaryPath;
 }
 
-async function runNativeDriver(args: string[]): Promise<string> {
-  const binaryPath = await buildNativeDriver();
-  const result = await runCommand({
-    command: binaryPath,
-    args,
-  });
-
-  return result.stdout.trim();
-}
-
 function parseJsonRecord(
   raw: string,
   errorMessage: string,
@@ -124,16 +143,97 @@ function parseDisplayInfo(raw: string): {
   return { displayWidth, displayHeight };
 }
 
-async function readScreenshotSize(
-  path: string,
-): Promise<{ width: number; height: number }> {
+async function defaultRunBinary(
+  binaryPath: string,
+  args: string[],
+): Promise<string> {
   const result = await runCommand({
-    command: 'sips',
-    args: ['-g', 'pixelWidth', '-g', 'pixelHeight', path],
+    command: binaryPath,
+    args,
   });
 
-  const widthMatch = result.stdout.match(/pixelWidth:\s*(\d+)/);
-  const heightMatch = result.stdout.match(/pixelHeight:\s*(\d+)/);
+  return result.stdout.trim();
+}
+
+async function defaultRunProcess(
+  command: string,
+  args: string[],
+): Promise<string> {
+  const result = await runCommand({ command, args });
+  return result.stdout;
+}
+
+const defaultDeps: NativeDriverDeps = {
+  async buildBinary(force = false) {
+    return await buildNativeDriver(force);
+  },
+  async readFile(path: string) {
+    return await readFileNode(path);
+  },
+  async runBinary(binaryPath: string, args: string[]) {
+    return await defaultRunBinary(binaryPath, args);
+  },
+  async runProcess(command: string, args: string[]) {
+    return await defaultRunProcess(command, args);
+  },
+};
+
+export function fitSizeWithinBounds(options: {
+  height: number;
+  maxHeight: number;
+  maxWidth: number;
+  width: number;
+}): Size {
+  if (
+    options.width <= options.maxWidth &&
+    options.height <= options.maxHeight
+  ) {
+    return { width: options.width, height: options.height };
+  }
+
+  const scale = Math.min(
+    options.maxWidth / options.width,
+    options.maxHeight / options.height,
+  );
+
+  return {
+    width: Math.max(1, Math.round(options.width * scale)),
+    height: Math.max(1, Math.round(options.height * scale)),
+  };
+}
+
+export async function prepareNativeDriverRuntime(
+  options: { forceRebuild?: boolean } = {},
+  deps: Pick<NativeDriverDeps, 'buildBinary' | 'runBinary'> = defaultDeps,
+): Promise<PreparedNativeDriverRuntime> {
+  assertMacOS();
+
+  const binaryPath = await deps.buildBinary(options.forceRebuild ?? false);
+  const displayInfo = parseDisplayInfo(
+    await deps.runBinary(binaryPath, ['display-info']),
+  );
+
+  return {
+    binaryPath,
+    displayWidth: displayInfo.displayWidth,
+    displayHeight: displayInfo.displayHeight,
+  };
+}
+
+async function readScreenshotSize(
+  path: string,
+  deps: Pick<NativeDriverDeps, 'runProcess'>,
+): Promise<Size> {
+  const stdout = await deps.runProcess('sips', [
+    '-g',
+    'pixelWidth',
+    '-g',
+    'pixelHeight',
+    path,
+  ]);
+
+  const widthMatch = stdout.match(/pixelWidth:\s*(\d+)/);
+  const heightMatch = stdout.match(/pixelHeight:\s*(\d+)/);
 
   if (widthMatch === null || heightMatch === null) {
     throw new MacAgentError('Unable to determine screenshot pixel dimensions.');
@@ -145,49 +245,134 @@ async function readScreenshotSize(
   };
 }
 
-async function readScreenshotMetadata(
-  path: string,
-): Promise<ScreenshotMetadata> {
-  const [{ width: screenshotWidth, height: screenshotHeight }, displayInfo] =
-    await Promise.all([
-      readScreenshotSize(path),
-      runNativeDriver(['display-info']).then(parseDisplayInfo),
-    ]);
+async function resizeScreenshotIfNeeded(options: {
+  deps: Pick<NativeDriverDeps, 'runProcess'>;
+  outputPath: string;
+  size: Size;
+  sourcePath: string;
+  visionBounds?: VisionBounds;
+}): Promise<Size> {
+  const { deps, outputPath, size, sourcePath, visionBounds } = options;
 
-  return {
-    screenshotWidth,
-    screenshotHeight,
-    displayWidth: displayInfo.displayWidth,
-    displayHeight: displayInfo.displayHeight,
-  };
+  if (visionBounds === undefined) {
+    await rename(sourcePath, outputPath);
+    return size;
+  }
+
+  const targetSize = fitSizeWithinBounds({
+    width: size.width,
+    height: size.height,
+    maxWidth: visionBounds.maxWidth,
+    maxHeight: visionBounds.maxHeight,
+  });
+
+  if (targetSize.width === size.width && targetSize.height === size.height) {
+    await rename(sourcePath, outputPath);
+    return size;
+  }
+
+  await deps.runProcess('sips', [
+    '-z',
+    String(targetSize.height),
+    String(targetSize.width),
+    sourcePath,
+    '--out',
+    outputPath,
+  ]);
+  await unlink(sourcePath);
+  return targetSize;
 }
 
 export async function captureFullScreen(
   outputPath: string,
+  options: {
+    runtime?: PreparedNativeDriverRuntime;
+    visionBounds?: VisionBounds;
+  } = {},
+  deps: Pick<
+    NativeDriverDeps,
+    'buildBinary' | 'readFile' | 'runBinary' | 'runProcess'
+  > = defaultDeps,
 ): Promise<ScreenCaptureResult> {
   assertMacOS();
 
-  await runCommand({
-    command: 'screencapture',
-    args: ['-x', outputPath],
-  });
+  const preparedDeps = {
+    buildBinary: (force = false) => deps.buildBinary(force),
+    runBinary: (binaryPath: string, args: string[]) =>
+      deps.runBinary(binaryPath, args),
+  };
 
-  const [metadata, imageBase64] = await Promise.all([
-    readScreenshotMetadata(outputPath),
-    readFile(outputPath).then((buffer) => buffer.toString('base64')),
-  ]);
+  const runtime =
+    options.runtime ?? (await prepareNativeDriverRuntime({}, preparedDeps));
+  const sourcePath = resolve(
+    dirname(outputPath),
+    `.raw-${basename(outputPath)}`,
+  );
+
+  await deps.runProcess('screencapture', ['-x', sourcePath]);
+
+  const sourceSize = await readScreenshotSize(sourcePath, deps);
+  const resizeOptions: {
+    deps: Pick<NativeDriverDeps, 'runProcess'>;
+    outputPath: string;
+    size: Size;
+    sourcePath: string;
+    visionBounds?: VisionBounds;
+  } = {
+    deps,
+    outputPath,
+    size: sourceSize,
+    sourcePath,
+  };
+
+  if (options.visionBounds !== undefined) {
+    resizeOptions.visionBounds = options.visionBounds;
+  }
+
+  const finalSize = await resizeScreenshotIfNeeded(resizeOptions);
+  const imageBase64 = (await deps.readFile(outputPath)).toString('base64');
 
   return {
-    ...metadata,
+    displayWidth: runtime.displayWidth,
+    displayHeight: runtime.displayHeight,
+    screenshotWidth: finalSize.width,
+    screenshotHeight: finalSize.height,
+    sourceWidth: sourceSize.width,
+    sourceHeight: sourceSize.height,
     imageBase64,
     filePath: outputPath,
   };
 }
 
-export function createNativePointerDriver(): PointerDriver {
+export function createNativePointerDriver(
+  runtime?: PreparedNativeDriverRuntime,
+  deps: Partial<Pick<NativeDriverDeps, 'buildBinary' | 'runBinary'>> = {},
+): PointerDriver {
+  const resolvedDeps = {
+    buildBinary: (force = false) =>
+      (deps.buildBinary ?? defaultDeps.buildBinary)(force),
+    runBinary: (binaryPath: string, args: string[]) =>
+      (deps.runBinary ?? defaultDeps.runBinary)(binaryPath, args),
+  };
+  let runtimePromise: Promise<PreparedNativeDriverRuntime> | null =
+    runtime === undefined ? null : Promise.resolve(runtime);
+
+  async function getRuntime(): Promise<PreparedNativeDriverRuntime> {
+    if (runtimePromise === null) {
+      runtimePromise = prepareNativeDriverRuntime({}, resolvedDeps);
+    }
+
+    return await runtimePromise;
+  }
+
+  async function runPrepared(args: string[]): Promise<void> {
+    const preparedRuntime = await getRuntime();
+    await resolvedDeps.runBinary(preparedRuntime.binaryPath, args);
+  }
+
   return {
     async click(point, button) {
-      await runNativeDriver([
+      await runPrepared([
         'click',
         '--x',
         String(point.x),
@@ -198,7 +383,7 @@ export function createNativePointerDriver(): PointerDriver {
       ]);
     },
     async doubleClick(point, button) {
-      await runNativeDriver([
+      await runPrepared([
         'double-click',
         '--x',
         String(point.x),
@@ -209,7 +394,7 @@ export function createNativePointerDriver(): PointerDriver {
       ]);
     },
     async move(point) {
-      await runNativeDriver([
+      await runPrepared([
         'move',
         '--x',
         String(point.x),
@@ -218,7 +403,7 @@ export function createNativePointerDriver(): PointerDriver {
       ]);
     },
     async drag(point) {
-      await runNativeDriver([
+      await runPrepared([
         'drag',
         '--x',
         String(point.x),
@@ -227,7 +412,7 @@ export function createNativePointerDriver(): PointerDriver {
       ]);
     },
     async scroll(point, delta) {
-      await runNativeDriver([
+      await runPrepared([
         'scroll',
         '--x',
         String(point.x),
