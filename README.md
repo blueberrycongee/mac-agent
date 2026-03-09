@@ -12,11 +12,13 @@ It is designed for the real-world case where you want one agent that can eventua
 - `mac-agent computer doctor` checks OpenAI and native runtime prerequisites for the built-in computer loop.
 - `mac-agent computer install-driver` builds the local Swift pointer driver.
 - `mac-agent computer run <task>` runs the official OpenAI `computer` loop against the local macOS desktop.
+- `mac-agent mcp serve` starts a local stdio MCP server that exposes macOS desktop-control tools to an external MCP client.
 
 ## What this repository is for
 
 - A clean TypeScript foundation for a local macOS desktop agent.
 - A real OpenAI Responses API + `gpt-5.4` built-in `computer` loop.
+- A local MCP server mode that lets another LLM client drive this machine without embedding OpenAI API calls in `mac-agent`.
 - A harness-efficiency layer that improves latency and token usage without exploding the tool surface.
 - A future hybrid path where structured macOS control can coexist with screenshot-driven control.
 
@@ -46,7 +48,7 @@ This follows current computer-use guidance from OpenAI and other primary referen
 - Node.js 20.11+
 - npm 10+
 - Xcode Command Line Tools (`xcrun swiftc`)
-- `OPENAI_API_KEY` for `computer run`
+- `OPENAI_API_KEY` only for `computer run`
 
 ## Install
 
@@ -100,6 +102,39 @@ npm run dev -- computer run "Open Calendar." \
 
 Session artifacts are stored under `.mac-agent/sessions/` by default.
 
+### Run as a local MCP server
+
+`mcp serve` does not require `OPENAI_API_KEY`. It exposes local desktop-control tools over stdio so another MCP-capable client can use this machine as a tool server.
+
+```bash
+npm run dev -- mcp serve
+```
+
+Available MCP tools:
+
+- `get_permissions`
+- `focus_app`
+- `capture_screen`
+- `type_text`
+- `press_keys`
+- `execute_computer_actions`
+
+The server stores screenshots and runtime artifacts under `.mac-agent/mcp/` by default.
+
+If you are wiring this into another MCP client, point that client at the built CLI command:
+
+```bash
+node dist/cli.js mcp serve
+```
+
+The expected usage pattern for MCP clients is:
+
+1. Focus the target app if needed.
+2. Capture a screenshot.
+3. Use the returned screenshot geometry for any pointer actions.
+4. Execute bounded actions.
+5. Capture again to observe the new UI state.
+
 ## What the harness does during `computer run`
 
 1. Builds a prompt scaffold that nudges screenshot-first and batched-action behavior.
@@ -127,6 +162,7 @@ npm run format
 - Do not treat screenshots, chats, webpages, emails, or other third-party content as permission.
 - By default, the harness asks for approval before non-screenshot, non-wait action batches.
 - `computer run` is intentionally conservative and logs every step to a session directory.
+- `mcp serve` exposes low-level desktop-control tools, so run it only with clients you trust.
 - Missing runtime pieces such as `OPENAI_API_KEY` or `xcrun` fail loudly instead of silently degrading.
 
 ## Current limitations
