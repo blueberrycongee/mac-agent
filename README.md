@@ -34,6 +34,10 @@ It is designed for the real-world case where you want one agent that can eventua
 
 This follows current computer-use guidance from OpenAI and other primary references: keep the harness narrow, let the model batch obvious actions, start screenshot-first when UI state is uncertain, and keep the human in the loop for meaningful risk.
 
+## References
+
+- See [`docs/references/`](./docs/references/README.md) for project-maintained notes on the external sources that inform this repository.
+
 ## Efficiency features now built in
 
 - **Prepared runtime**: the native driver and display metrics are prepared once per run instead of rediscovered per action.
