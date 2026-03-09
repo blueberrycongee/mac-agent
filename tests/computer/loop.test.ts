@@ -142,6 +142,69 @@ describe('runComputerLoop', () => {
     expect(capture).toHaveBeenCalledTimes(2);
   });
 
+  test('applies settle delay only after executable action batches', async () => {
+    const responses: ComputerResponseLike[] = [
+      {
+        id: 'resp_1',
+        output: [
+          {
+            type: 'computer_call',
+            call_id: 'call_1',
+            status: 'completed',
+            actions: [{ type: 'screenshot' }],
+          },
+        ],
+      },
+      {
+        id: 'resp_2',
+        output: [
+          {
+            type: 'computer_call',
+            call_id: 'call_2',
+            status: 'completed',
+            actions: [{ type: 'click', x: 10, y: 10, button: 'left' }],
+          },
+        ],
+      },
+      {
+        id: 'resp_3',
+        output_text: 'Done',
+        output: [],
+      },
+    ];
+
+    const sleep = vi.fn(() => Promise.resolve());
+
+    await runComputerLoop({
+      model: 'gpt-5.4',
+      prompt: 'Do the thing.',
+      maxSteps: 5,
+      uiSettleMs: 175,
+      sleep,
+      client: {
+        startTask: () => Promise.resolve(responses[0]!),
+        continueTask: vi
+          .fn<
+            (options: {
+              model: string;
+              previousResponseId: string;
+              input: unknown;
+            }) => Promise<ComputerResponseLike>
+          >()
+          .mockImplementationOnce(() => Promise.resolve(responses[1]!))
+          .mockImplementationOnce(() => Promise.resolve(responses[2]!)),
+      },
+      captureScreen: {
+        capture: (stepIndex) => Promise.resolve(createCapture(stepIndex)),
+      },
+      executeActions: () => Promise.resolve(),
+      confirmActions: () => Promise.resolve(),
+    });
+
+    expect(sleep).toHaveBeenCalledTimes(1);
+    expect(sleep).toHaveBeenCalledWith(175);
+  });
+
   test('throws when the loop exceeds the configured max step count', async () => {
     const startTask = vi.fn(
       (): Promise<ComputerResponseLike> =>
