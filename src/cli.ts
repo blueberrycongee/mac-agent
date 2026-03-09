@@ -8,7 +8,10 @@ import { Command } from 'commander';
 import { createApprovalGate } from './computer/approval.js';
 import { executeComputerActions } from './computer/executor.js';
 import { runComputerLoop } from './computer/loop.js';
+import { createStepMetricsEvent } from './computer/metrics.js';
 import { createOpenAIComputerClient } from './computer/openai-client.js';
+import { buildComputerRunPrompt } from './computer/prompt-policy.js';
+import { createRunProfile } from './computer/run-profile.js';
 import {
   appendSessionEvent,
   createComputerSession,
@@ -23,6 +26,7 @@ import {
   createNativePointerDriver,
   getNativeDriverBinaryPath,
   getNativeDriverSourcePath,
+  prepareNativeDriverRuntime,
 } from './macos/native-driver.js';
 import { formatPermissionGuidance } from './macos/permissions.js';
 import { assertMacOS } from './macos/platform.js';
@@ -31,6 +35,16 @@ interface DoctorCheck {
   name: string;
   ok: boolean;
   detail: string;
+}
+
+interface ComputerRunCommandOptions {
+  autoApprove: boolean;
+  maxSteps: number;
+  model: string;
+  sessionRoot: string;
+  uiSettleMs: number;
+  visionHeight: number;
+  visionWidth: number;
 }
 
 async function toolExists(path: string): Promise<boolean> {
@@ -213,44 +227,76 @@ async function main(): Promise<void> {
       'Directory where session logs and screenshots will be stored',
       '.mac-agent/sessions',
     )
+    .option(
+      '--vision-width <pixels>',
+      'Maximum width of the screenshot sent to the model',
+      parsePositiveInteger,
+      1440,
+    )
+    .option(
+      '--vision-height <pixels>',
+      'Maximum height of the screenshot sent to the model',
+      parsePositiveInteger,
+      900,
+    )
+    .option(
+      '--ui-settle-ms <milliseconds>',
+      'Extra UI settle delay after executable action batches',
+      parsePositiveInteger,
+      150,
+    )
     .option('--auto-approve', 'Skip per-batch approval prompts', false)
     .action(
       async (
         taskParts: string[],
-        commandOptions: {
-          autoApprove: boolean;
-          maxSteps: number;
-          model: string;
-          sessionRoot: string;
-        },
+        commandOptions: ComputerRunCommandOptions,
       ) => {
         assertMacOS();
 
         const task = taskParts.join(' ');
+        const profile = createRunProfile({
+          uiSettleMs: commandOptions.uiSettleMs,
+          visionHeight: commandOptions.visionHeight,
+          visionWidth: commandOptions.visionWidth,
+        });
         const session = await createComputerSession(commandOptions.sessionRoot);
+        const runtime = await prepareNativeDriverRuntime();
+
         await appendSessionEvent(session, {
           type: 'task',
           model: commandOptions.model,
           prompt: task,
+          effectivePrompt: buildComputerRunPrompt(task),
           maxSteps: commandOptions.maxSteps,
           autoApprove: commandOptions.autoApprove,
+          runProfile: profile,
+          runtime,
         });
 
         const approvalGate = createApprovalGate({
           autoApprove: commandOptions.autoApprove,
         });
-        const pointer = createNativePointerDriver();
+        const pointer = createNativePointerDriver(runtime);
         const client = createOpenAIComputerClient();
 
         const result = await runComputerLoop({
           model: commandOptions.model,
-          prompt: task,
+          prompt: buildComputerRunPrompt(task),
           maxSteps: commandOptions.maxSteps,
+          uiSettleMs: profile.uiSettleMs,
+          sleep,
           client,
           captureScreen: {
             capture(stepIndex) {
               return captureFullScreen(
                 getSessionScreenshotPath(session, stepIndex),
+                {
+                  runtime,
+                  visionBounds: {
+                    maxWidth: profile.visionWidth,
+                    maxHeight: profile.visionHeight,
+                  },
+                },
               );
             },
           },
@@ -296,7 +342,15 @@ async function main(): Promise<void> {
                 screenshotHeight: screenshot.screenshotHeight,
                 displayWidth: screenshot.displayWidth,
                 displayHeight: screenshot.displayHeight,
+                sourceWidth: screenshot.sourceWidth ?? null,
+                sourceHeight: screenshot.sourceHeight ?? null,
               });
+            },
+            onStepMetrics({ metrics }) {
+              return appendSessionEvent(
+                session,
+                createStepMetricsEvent(metrics),
+              );
             },
             onFinal({ finalOutput, stepIndex }) {
               return appendSessionEvent(session, {

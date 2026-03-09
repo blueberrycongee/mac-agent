@@ -9,14 +9,24 @@ export {
   type ComputerLoopOptions,
 } from './computer/loop.js';
 export {
+  createStepMetricsEvent,
+  type StepMetrics,
+} from './computer/metrics.js';
+export {
   createOpenAIComputerClient,
   type ComputerLoopClient,
 } from './computer/openai-client.js';
+export { buildComputerRunPrompt } from './computer/prompt-policy.js';
 export {
   buildComputerCallOutput,
   extractComputerCall,
   extractFinalOutputText,
 } from './computer/protocol.js';
+export {
+  createRunProfile,
+  defaultRunProfile,
+  type RunProfile,
+} from './computer/run-profile.js';
 export {
   appendSessionEvent,
   createComputerSession,
@@ -51,12 +61,16 @@ export {
   buildNativeDriver,
   captureFullScreen,
   createNativePointerDriver,
+  fitSizeWithinBounds,
   getNativeDriverBinaryPath,
   getNativeDriverSourcePath,
+  prepareNativeDriverRuntime,
   type DisplayPoint,
   type MouseButton,
   type PointerDriver,
+  type PreparedNativeDriverRuntime,
   type ScreenCaptureResult,
+  type VisionBounds,
 } from './macos/native-driver.js';
 export {
   formatPermissionGuidance,
