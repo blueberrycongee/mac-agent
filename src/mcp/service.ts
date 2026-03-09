@@ -16,7 +16,6 @@ import {
   captureFullScreen,
   createNativePointerDriver,
   prepareNativeDriverRuntime,
-  type PointerDriver,
   type PreparedNativeDriverRuntime,
   type ScreenCaptureResult,
   type VisionBounds,
@@ -89,31 +88,14 @@ export function createDesktopControlService(
   const stateRoot = resolve(options.stateRoot ?? '.mac-agent/mcp');
   const screenshotsDir = resolve(stateRoot, 'screenshots');
 
-  let runtimePromise: Promise<PreparedNativeDriverRuntime> | null = null;
-  let pointerPromise: Promise<PointerDriver> | null = null;
-
-  async function ensureRuntime(): Promise<PreparedNativeDriverRuntime> {
-    if (runtimePromise === null) {
-      runtimePromise = deps.prepareNativeDriverRuntime();
-    }
-
-    return await runtimePromise;
-  }
-
-  async function ensurePointer(): Promise<PointerDriver> {
-    if (pointerPromise === null) {
-      pointerPromise = ensureRuntime().then((runtime) => {
-        return deps.createNativePointerDriver(runtime);
-      });
-    }
-
-    return await pointerPromise;
+  async function prepareCurrentRuntime(): Promise<PreparedNativeDriverRuntime> {
+    return await deps.prepareNativeDriverRuntime();
   }
 
   return {
     async captureScreen(captureOptions = {}) {
       await deps.mkdir(screenshotsDir);
-      const runtime = await ensureRuntime();
+      const runtime = await prepareCurrentRuntime();
       const captureRequest: {
         runtime: PreparedNativeDriverRuntime;
         visionBounds?: VisionBounds;
@@ -131,7 +113,9 @@ export function createDesktopControlService(
       );
     },
     async executeActions(executeOptions) {
-      const pointer = await ensurePointer();
+      const pointer = deps.createNativePointerDriver(
+        await prepareCurrentRuntime(),
+      );
       await executeComputerActions(executeOptions.actions, {
         ...executeOptions.geometry,
         keyboard: deps.keyboard,
