@@ -41,7 +41,8 @@
     "computer-use"
   ],
   "dependencies": {
-    "commander": "^14.0.3"
+    "commander": "^14.0.3",
+    "openai": "^6.27.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
