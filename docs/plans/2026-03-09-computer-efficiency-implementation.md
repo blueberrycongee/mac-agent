@@ -13,6 +13,7 @@
 ### Task 1: Add prompt and run-profile efficiency policies
 
 **Files:**
+
 - Create: `src/computer/prompt-policy.ts`
 - Create: `src/computer/run-profile.ts`
 - Create: `tests/computer/prompt-policy.test.ts`
@@ -21,6 +22,7 @@
 **Step 1: Write failing tests**
 
 Cover:
+
 - prompt scaffold content for screenshot-first, batching, and stop behavior
 - default run profile values for vision size and UI settle delay
 
@@ -45,12 +47,14 @@ Run: `git add src/computer tests/computer docs/plans && git commit -m "feat: add
 ### Task 2: Add prepared runtime and canonical screenshot sizing
 
 **Files:**
+
 - Modify: `src/macos/native-driver.ts`
 - Create: `tests/macos/native-driver.test.ts`
 
 **Step 1: Write failing tests**
 
 Cover:
+
 - prepared runtime handle shape
 - no repeated rebuild checks when a prepared handle is reused
 - screenshot resize decision behavior
@@ -76,6 +80,7 @@ Run: `git add src/macos tests/macos && git commit -m "feat: optimize computer ru
 ### Task 3: Add settle-delay handling and metrics to the loop
 
 **Files:**
+
 - Create: `src/computer/metrics.ts`
 - Modify: `src/computer/loop.ts`
 - Modify: `src/computer/session.ts`
@@ -85,6 +90,7 @@ Run: `git add src/macos tests/macos && git commit -m "feat: optimize computer ru
 **Step 1: Write failing tests**
 
 Cover:
+
 - settle delay only after non-screenshot action batches
 - metric event creation for response, execution, capture, and settle timings
 
@@ -109,6 +115,7 @@ Run: `git add src/computer tests/computer && git commit -m "feat: instrument com
 ### Task 4: Wire the efficient defaults into the CLI and docs
 
 **Files:**
+
 - Modify: `src/cli.ts`
 - Modify: `README.md`
 - Modify: `docs/plans/2026-03-09-computer-efficiency-design.md`
@@ -121,6 +128,7 @@ Add the minimal new flags and use the prompt/run-profile/runtime helpers in `com
 **Step 2: Update docs honestly**
 
 Explain:
+
 - why the harness downsizes screenshots
 - how prompt steering works
 - what `--vision-width`, `--vision-height`, and `--ui-settle-ms` do
@@ -128,6 +136,7 @@ Explain:
 **Step 3: Run full verification**
 
 Run:
+
 - `npm run lint`
 - `npm run typecheck`
 - `npm run build`
