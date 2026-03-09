@@ -56,11 +56,11 @@ Responsibilities:
 
 A local macOS runtime adapter provides:
 
-- full-screen capture
+- full-screen capture via `screencapture`
 - coordinate normalization between screenshot pixels and display points
 - action execution for official action types
 
-The first version will support:
+The first version supports:
 
 - `click`
 - `double_click`
@@ -74,15 +74,15 @@ The first version will support:
 
 ### 4. Native driver layer
 
-Because macOS does not expose reliable coordinate mouse control directly through Node.js alone, the repository will include a small checked-in Swift helper.
+Because macOS does not expose reliable coordinate mouse control directly through Node.js alone, the repository includes a small checked-in Swift helper.
 
-The helper will handle:
+The helper handles:
 
-- screenshot capture
+- display metrics
 - mouse move/click/double-click/drag
 - scroll wheel events
 
-Keyboard typing and keypress chords will be executed through AppleScript/System Events from the TypeScript layer, because that path is smaller and easier to audit for the first version.
+Keyboard typing and keypress chords are executed through AppleScript/System Events from the TypeScript layer, because that path is smaller and easier to audit for the first version.
 
 ### 5. Safety and logging layer
 
@@ -118,22 +118,22 @@ The harness must fail honestly.
 
 ## Testing strategy
 
-The first version will use TDD for the pure logic and dependency-injected loop.
+The first version uses TDD for pure logic and the dependency-injected loop.
 
-Unit tests will cover:
+Unit tests cover:
 
 - extracting `computer_call` items from API-like responses
 - building `computer_call_output` payloads
 - coordinate mapping from screenshot pixels to display points
-- deciding whether an action batch requires approval
-- action execution plan routing for supported action types
+- routing supported action types to the right local executor
 - loop orchestration with mocked OpenAI client, screenshot provider, and executor
 
-Manual verification will cover:
+Manual verification covers:
 
 - driver build command
 - `computer doctor`
-- CLI help and argument parsing
+- `computer install-driver`
+- CLI argument parsing
 - a non-destructive local run only if credentials are available
 
 ## Out of scope for this slice
