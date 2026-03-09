@@ -1,0 +1,56 @@
+{
+  "name": "mac-agent",
+  "version": "0.1.0",
+  "description": "A local macOS desktop agent scaffold built for OpenAI computer-use workflows.",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blueberrycongee/mac-agent.git"
+  },
+  "homepage": "https://github.com/blueberrycongee/mac-agent#readme",
+  "bugs": {
+    "url": "https://github.com/blueberrycongee/mac-agent/issues"
+  },
+  "engines": {
+    "node": ">=20.11"
+  },
+  "bin": {
+    "mac-agent": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli.ts",
+    "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "keywords": [
+    "macos",
+    "agent",
+    "desktop-agent",
+    "openai",
+    "computer-use"
+  ],
+  "dependencies": {
+    "commander": "^14.0.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.3.5",
+    "eslint": "^10.0.3",
+    "prettier": "^3.8.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^4.0.18"
+  }
+}
