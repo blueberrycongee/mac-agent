@@ -2,7 +2,7 @@
 
 `mac-agent` is a local macOS desktop-agent scaffold built for OpenAI `gpt-5.4` computer-use workflows.
 
-It is designed for the real-world case where you want one agent that can eventually control both system apps and third-party desktop apps such as WeCom. The repository intentionally ships an honest vertical slice: a working local `computer` loop harness with clear limits, instead of pretending the whole desktop agent is already finished.
+It is designed for the real-world case where you want one agent that can eventually control both system apps and third-party desktop apps such as WeCom. The repository intentionally ships an honest vertical slice: a working local `computer` loop harness with clear limits, plus a small efficiency layer that reduces avoidable harness overhead before adding broader tool surfaces.
 
 ## What works today
 
@@ -17,18 +17,28 @@ It is designed for the real-world case where you want one agent that can eventua
 
 - A clean TypeScript foundation for a local macOS desktop agent.
 - A real OpenAI Responses API + `gpt-5.4` built-in `computer` loop.
-- A hybrid future path where structured macOS control can coexist with screenshot-driven control.
+- A harness-efficiency layer that improves latency and token usage without exploding the tool surface.
+- A future hybrid path where structured macOS control can coexist with screenshot-driven control.
 
 ## Current architecture
 
-`mac-agent` is currently shaped around four layers:
+`mac-agent` is currently shaped around five layers:
 
 1. **CLI and session layer**: command entrypoints, session directories, screenshot storage, and JSONL event logs.
 2. **OpenAI loop layer**: request/response orchestration for the built-in `computer` tool.
-3. **macOS runtime layer**: screenshot capture via `screencapture`, pointer events via a local Swift helper, and keyboard input via AppleScript/System Events.
-4. **Safety layer**: confirmation gates, max-step protection, and loud failures for missing runtime requirements.
+3. **Prompt policy layer**: a small scaffold that nudges screenshot-first behavior, action batching, and early stopping.
+4. **macOS runtime layer**: screenshot capture via `screencapture`, pointer events via a local Swift helper, and keyboard input via AppleScript/System Events.
+5. **Efficiency and safety layer**: prepared runtime caching, canonical vision bounds, confirmation gates, max-step protection, post-batch UI settle delay, and step metrics.
 
-This follows OpenAI's current `computer use` guidance: keep a human in the loop for risky actions, treat on-screen content as untrusted input, and keep the harness narrow before layering on more automation.
+This follows current computer-use guidance from OpenAI and other primary references: keep the harness narrow, let the model batch obvious actions, start screenshot-first when UI state is uncertain, and keep the human in the loop for meaningful risk.
+
+## Efficiency features now built in
+
+- **Prepared runtime**: the native driver and display metrics are prepared once per run instead of rediscovered per action.
+- **Canonical vision bounds**: screenshots are resized before being sent to the model, which improves token efficiency and coordinate stability.
+- **Prompt steering**: the harness nudges screenshot-first and batched-action behavior without adding a wide custom tool surface.
+- **UI settle policy**: after executable action batches, the harness can wait briefly before recapturing the screen.
+- **Step metrics**: each session can log response, execution, settle, and capture timings.
 
 ## Requirements
 
@@ -76,16 +86,31 @@ By default, `mac-agent` asks for approval before each non-trivial action batch. 
 npm run dev -- computer run "Open Calendar." --auto-approve
 ```
 
+### Tune efficiency knobs
+
+```bash
+npm run dev -- computer run "Open Calendar." \
+  --vision-width 1440 \
+  --vision-height 900 \
+  --ui-settle-ms 150
+```
+
+- `--vision-width` and `--vision-height` cap the screenshot size sent to the model.
+- `--ui-settle-ms` adds a short post-batch settle delay before the next screenshot.
+
 Session artifacts are stored under `.mac-agent/sessions/` by default.
 
 ## What the harness does during `computer run`
 
-1. Sends your task to `gpt-5.4` with `tools: [{ type: "computer" }]`.
-2. Waits for a `computer_call` from the model.
-3. Executes returned actions locally on macOS.
-4. Captures a fresh screenshot.
-5. Sends that screenshot back as `computer_call_output`.
-6. Repeats until the model returns a final answer or the step cap is hit.
+1. Builds a prompt scaffold that nudges screenshot-first and batched-action behavior.
+2. Sends your task to `gpt-5.4` with `tools: [{ type: "computer" }]`.
+3. Waits for a `computer_call` from the model.
+4. Executes returned actions locally on macOS.
+5. Waits briefly for UI settle when configured.
+6. Captures a resized screenshot for the model.
+7. Sends that screenshot back as `computer_call_output`.
+8. Logs timings and geometry for the step.
+9. Repeats until the model returns a final answer or the step cap is hit.
 
 ## Development
 
@@ -110,7 +135,7 @@ npm run format
 - No WeCom-specific adapter yet.
 - No Accessibility tree inspection yet.
 - No semantic policy engine for high-risk actions beyond per-batch approval.
-- The loop currently assumes the model gets screenshot context before attempting executable UI actions.
+- No broader code-execution or adapter mode yet.
 
 ## Roadmap
 
