@@ -7,8 +7,12 @@ import {
 
 describe('buildActivateAppleScript', () => {
   test('quotes app names safely for AppleScript', () => {
-    expect(buildActivateAppleScript('Calendar')).toContain('application "Calendar"');
-    expect(buildActivateAppleScript('Foo "Bar"')).toContain(String.raw`application "Foo \"Bar\""`);
+    expect(buildActivateAppleScript('Calendar')).toContain(
+      'application "Calendar"',
+    );
+    expect(buildActivateAppleScript('Foo "Bar"')).toContain(
+      String.raw`application "Foo \"Bar\""`,
+    );
   });
 });
 

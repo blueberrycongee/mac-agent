@@ -6,14 +6,8 @@
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
-  "include": [
-    "src/**/*.ts"
-  ],
-  "exclude": [
-    "tests/**/*.ts"
-  ]
+  "include": ["src/**/*.ts"],
+  "exclude": ["tests/**/*.ts"]
 }
