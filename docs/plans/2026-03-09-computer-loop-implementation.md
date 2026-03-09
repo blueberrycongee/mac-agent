@@ -13,6 +13,7 @@
 ### Task 1: Add the OpenAI and computer-loop foundations
 
 **Files:**
+
 - Modify: `package.json`
 - Modify: `package-lock.json`
 - Create: `src/computer/types.ts`
@@ -24,6 +25,7 @@
 **Step 1: Write failing tests**
 
 Add tests for:
+
 - extracting a `computer_call`
 - extracting final output text
 - building a `computer_call_output` payload
@@ -50,6 +52,7 @@ Run: `git add package.json package-lock.json src/computer tests/computer && git 
 ### Task 2: Add the local macOS runtime driver
 
 **Files:**
+
 - Create: `native/mac_agent_driver.swift`
 - Create: `src/macos/native-driver.ts`
 - Create: `src/macos/keyboard.ts`
@@ -60,6 +63,7 @@ Run: `git add package.json package-lock.json src/computer tests/computer && git 
 **Step 1: Write failing tests**
 
 Cover:
+
 - routing supported action types to the correct local executor path
 - keypress parsing for basic modifier chords
 - screenshot/display coordinate scaling usage
@@ -85,6 +89,7 @@ Run: `git add native src/macos src/computer tests && git commit -m "feat: add lo
 ### Task 3: Add the loop orchestrator, logging, and CLI wiring
 
 **Files:**
+
 - Create: `src/computer/session.ts`
 - Create: `src/computer/approval.ts`
 - Create: `src/computer/openai-client.ts`
@@ -96,6 +101,7 @@ Run: `git add native src/macos src/computer tests && git commit -m "feat: add lo
 **Step 1: Write failing tests**
 
 Add loop tests using fake OpenAI client, fake screen capture, and fake executor to verify:
+
 - screenshot-first loop behavior
 - action execution + follow-up screenshot behavior
 - stopping on final output
@@ -109,6 +115,7 @@ Expected: loop tests fail before implementation.
 **Step 3: Implement the loop and CLI**
 
 Add:
+
 - `computer doctor`
 - `computer install-driver`
 - `computer run <task>`
@@ -118,6 +125,7 @@ Wire the CLI to the loop core, confirmations, session logging, and OpenAI client
 **Step 4: Run tests and targeted manual checks**
 
 Run:
+
 - `npm test`
 - `npm run dev -- computer doctor`
 - `npm run dev -- computer install-driver`
@@ -131,6 +139,7 @@ Run: `git add src tests && git commit -m "feat: add computer use CLI harness"`
 ### Task 4: Document the new harness and verify the repository
 
 **Files:**
+
 - Modify: `README.md`
 - Modify: `docs/plans/2026-03-09-computer-loop-design.md`
 - Modify: `docs/plans/2026-03-09-computer-loop-implementation.md`
@@ -138,6 +147,7 @@ Run: `git add src tests && git commit -m "feat: add computer use CLI harness"`
 **Step 1: Update docs honestly**
 
 Document:
+
 - required environment variables
 - required macOS permissions
 - the safety model
@@ -147,6 +157,7 @@ Document:
 **Step 2: Run full repository verification**
 
 Run:
+
 - `npm run lint`
 - `npm run typecheck`
 - `npm run build`
