@@ -49,10 +49,12 @@ These issues waste time or tokens before the model itself becomes the limiting f
 Examples would include app-specific tools, OCR helpers, text clicking helpers, or Accessibility-first adapters.
 
 **Pros**
+
 - can reduce turns for selected applications
 - can outperform raw computer use on highly structured workflows
 
 **Cons**
+
 - grows the tool surface quickly
 - increases tool-selection complexity
 - moves the project away from the official built-in `computer` path too early
@@ -65,12 +67,14 @@ Examples would include app-specific tools, OCR helpers, text clicking helpers, o
 Keep the current official OpenAI path, but improve the harness around it.
 
 **Pros**
+
 - directly addresses latency and token waste
 - stays aligned with OpenAI's built-in `computer` loop
 - improves all future tasks, not only app-specific ones
 - does not require a wider tool surface
 
 **Cons**
+
 - still limited by screenshot-based interaction
 - does not solve app-specific workflows on its own
 
@@ -81,10 +85,12 @@ Keep the current official OpenAI path, but improve the harness around it.
 Use a richer orchestration layer right away, mixing the built-in `computer` tool with structured helper operations.
 
 **Pros**
+
 - potentially faster for known workflows
 - good long-term architecture
 
 **Cons**
+
 - premature for this stage
 - introduces more moving parts before the current bottlenecks are measured
 - harder to attribute improvements to the right layer
