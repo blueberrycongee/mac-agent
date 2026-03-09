@@ -47,6 +47,14 @@ export {
 } from './core/errors.js';
 export { err, ok, type Result } from './core/result.js';
 export {
+  createMacAgentMcpServer,
+  startMacAgentMcpServer,
+} from './mcp/server.js';
+export {
+  createDesktopControlService,
+  type DesktopControlService,
+} from './mcp/service.js';
+export {
   buildActivateAppleScript,
   createFocusAppExecutionPlan,
   focusApplication,

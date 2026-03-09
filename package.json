@@ -41,8 +41,10 @@
     "computer-use"
   ],
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "commander": "^14.0.3",
-    "openai": "^6.27.0"
+    "openai": "^6.27.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

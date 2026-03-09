@@ -20,6 +20,7 @@ import {
 import { CommandExecutionError } from './core/errors.js';
 import { focusApplication } from './macos/apps.js';
 import { pressKeys, typeText } from './macos/keyboard.js';
+import { startMacAgentMcpServer } from './mcp/server.js';
 import {
   buildNativeDriver,
   captureFullScreen,
@@ -45,6 +46,10 @@ interface ComputerRunCommandOptions {
   uiSettleMs: number;
   visionHeight: number;
   visionWidth: number;
+}
+
+interface McpServeCommandOptions {
+  stateRoot: string;
 }
 
 async function toolExists(path: string): Promise<boolean> {
@@ -189,6 +194,9 @@ async function main(): Promise<void> {
   const computerCommand = program
     .command('computer')
     .description('OpenAI computer-use harness commands.');
+  const mcpCommand = program
+    .command('mcp')
+    .description('Model Context Protocol server commands.');
 
   computerCommand
     .command('doctor')
@@ -368,6 +376,21 @@ async function main(): Promise<void> {
         console.log(`Session log: ${session.rootDir}`);
       },
     );
+
+  mcpCommand
+    .command('serve')
+    .description('Start a stdio MCP server for local macOS desktop control.')
+    .option(
+      '--state-root <path>',
+      'Directory where MCP screenshots and runtime state will be stored',
+      '.mac-agent/mcp',
+    )
+    .action(async (options: McpServeCommandOptions) => {
+      assertMacOS();
+      await startMacAgentMcpServer({
+        stateRoot: options.stateRoot,
+      });
+    });
 
   await program.parseAsync(process.argv);
 }
