@@ -1,0 +1,36 @@
+name: Bug report
+description: Report a reproducible defect in mac-agent.
+title: 'bug: '
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: List the smallest steps that reproduce the issue.
+      placeholder: |
+        1. Run ...
+        2. Focus app ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include macOS version, Node.js version, and app name if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste any useful output.

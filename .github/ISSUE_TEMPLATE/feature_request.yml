@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest a focused improvement for mac-agent.
+title: 'feat: '
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What user problem should this feature solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+      description: Describe the simplest approach that could work.
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks or safety concerns
+      description: Call out any destructive actions, sensitive data, or permission issues.
