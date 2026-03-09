@@ -1,13 +1,14 @@
+import type { ScreenCaptureResult } from '../macos/native-driver.js';
 import { MacAgentError } from '../core/errors.js';
 import { requiresApproval } from './approval.js';
+import type { StepMetrics } from './metrics.js';
 import {
   buildComputerCallOutput,
   extractComputerCall,
   extractFinalOutputText,
 } from './protocol.js';
-import type { ScreenCaptureResult } from '../macos/native-driver.js';
-import type { ComputerCallAction, ComputerResponseLike } from './types.js';
 import type { ComputerLoopClient } from './openai-client.js';
+import type { ComputerCallAction, ComputerResponseLike } from './types.js';
 
 export interface ComputerLoopHooks {
   onComputerCall?(options: {
@@ -24,6 +25,7 @@ export interface ComputerLoopHooks {
     screenshot: ScreenCaptureResult;
     stepIndex: number;
   }): Promise<void>;
+  onStepMetrics?(options: { metrics: StepMetrics }): Promise<void>;
 }
 
 export interface ComputerLoopOptions {
@@ -42,7 +44,10 @@ export interface ComputerLoopOptions {
   hooks?: ComputerLoopHooks;
   maxSteps: number;
   model: string;
+  now?: () => number;
   prompt: string;
+  sleep?: (ms: number) => Promise<void>;
+  uiSettleMs?: number;
 }
 
 function hasExecutableAction(actions: ComputerCallAction[]): boolean {
@@ -66,13 +71,40 @@ function fallbackScreenshotContext(): ScreenCaptureResult {
   };
 }
 
+function defaultSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function timed<T>(
+  now: () => number,
+  operation: () => Promise<T>,
+): Promise<{ durationMs: number; value: T }> {
+  const startedAt = now();
+  const value = await operation();
+  return {
+    durationMs: now() - startedAt,
+    value,
+  };
+}
+
 export async function runComputerLoop(
   options: ComputerLoopOptions,
 ): Promise<{ finalOutput: string; steps: number }> {
-  let response = await options.client.startTask({
-    model: options.model,
-    prompt: options.prompt,
+  const now = options.now ?? Date.now;
+  const sleep = options.sleep ?? defaultSleep;
+  const uiSettleMs = options.uiSettleMs ?? 0;
+
+  const firstResponseResult = await timed(now, async () => {
+    return await options.client.startTask({
+      model: options.model,
+      prompt: options.prompt,
+    });
   });
+
+  let response = firstResponseResult.value;
+  let responseMs = firstResponseResult.durationMs;
   let latestScreenshot: ScreenCaptureResult | null = null;
 
   for (let stepIndex = 0; stepIndex < options.maxSteps; stepIndex += 1) {
@@ -91,6 +123,8 @@ export async function runComputerLoop(
       stepIndex,
     });
 
+    const approvalRequired = requiresApproval(computerCall.actions);
+
     if (
       latestScreenshot === null &&
       hasExecutableAction(computerCall.actions)
@@ -100,38 +134,79 @@ export async function runComputerLoop(
       );
     }
 
-    if (requiresApproval(computerCall.actions)) {
+    if (approvalRequired) {
       await options.confirmActions?.(computerCall.actions, {
         callId: computerCall.callId,
         stepIndex,
       });
     }
 
+    let executeMs = 0;
     if (hasNonScreenshotAction(computerCall.actions)) {
-      await options.executeActions(
-        computerCall.actions,
-        latestScreenshot ?? fallbackScreenshotContext(),
-      );
+      const executeResult = await timed(now, async () => {
+        await options.executeActions(
+          computerCall.actions,
+          latestScreenshot ?? fallbackScreenshotContext(),
+        );
+      });
+      executeMs = executeResult.durationMs;
     }
 
-    const screenshot = await options.captureScreen.capture(stepIndex);
+    let settleMs = 0;
+    if (hasExecutableAction(computerCall.actions) && uiSettleMs > 0) {
+      const settleResult = await timed(now, async () => {
+        await sleep(uiSettleMs);
+      });
+      settleMs = settleResult.durationMs;
+    }
+
+    const captureResult = await timed(now, async () => {
+      return await options.captureScreen.capture(stepIndex);
+    });
+    const screenshot = captureResult.value;
     latestScreenshot = screenshot;
     await options.hooks?.onScreenshot?.({ screenshot, stepIndex });
+    const metrics: StepMetrics = {
+      actionCount: computerCall.actions.length,
+      approvalRequired,
+      captureMs: captureResult.durationMs,
+      executeMs,
+      responseMs,
+      screenshotHeight: screenshot.screenshotHeight,
+      screenshotWidth: screenshot.screenshotWidth,
+      settleMs,
+      stepIndex,
+    };
+
+    if (typeof screenshot.sourceHeight === 'number') {
+      metrics.sourceHeight = screenshot.sourceHeight;
+    }
+    if (typeof screenshot.sourceWidth === 'number') {
+      metrics.sourceWidth = screenshot.sourceWidth;
+    }
+
+    await options.hooks?.onStepMetrics?.({ metrics });
 
     if (typeof response.id !== 'string' || response.id.length === 0) {
       throw new MacAgentError(
         'Computer loop response is missing a response id for follow-up turns.',
       );
     }
+    const previousResponseId = response.id;
 
-    response = await options.client.continueTask({
-      model: options.model,
-      previousResponseId: response.id,
-      input: buildComputerCallOutput({
-        callId: computerCall.callId,
-        imageBase64: screenshot.imageBase64,
-      }),
+    const continueResult = await timed(now, async () => {
+      return await options.client.continueTask({
+        model: options.model,
+        previousResponseId,
+        input: buildComputerCallOutput({
+          callId: computerCall.callId,
+          imageBase64: screenshot.imageBase64,
+        }),
+      });
     });
+
+    response = continueResult.value;
+    responseMs = continueResult.durationMs;
   }
 
   throw new MacAgentError(
