@@ -8,6 +8,8 @@ describe('assertMacOS', () => {
   });
 
   test('throws on unsupported platforms', () => {
-    expect(() => assertMacOS('linux')).toThrow('mac-agent currently supports macOS only');
+    expect(() => assertMacOS('linux')).toThrow(
+      'mac-agent currently supports macOS only',
+    );
   });
 });

@@ -32,7 +32,9 @@ async function collectDoctorChecks(): Promise<DoctorCheck[]> {
     {
       name: 'Platform',
       ok: isMac,
-      detail: isMac ? 'Running on macOS.' : `Unsupported platform: ${process.platform}`,
+      detail: isMac
+        ? 'Running on macOS.'
+        : `Unsupported platform: ${process.platform}`,
     },
     {
       name: 'open',
@@ -64,12 +66,16 @@ async function main(): Promise<void> {
 
   program
     .name('mac-agent')
-    .description('A local macOS desktop agent scaffold for OpenAI computer-use workflows.')
+    .description(
+      'A local macOS desktop agent scaffold for OpenAI computer-use workflows.',
+    )
     .version('0.1.0');
 
   program
     .command('doctor')
-    .description('Inspect the local machine for the baseline macOS agent prerequisites.')
+    .description(
+      'Inspect the local machine for the baseline macOS agent prerequisites.',
+    )
     .action(async () => {
       const checks = await collectDoctorChecks();
       printDoctorChecks(checks);

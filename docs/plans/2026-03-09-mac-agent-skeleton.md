@@ -13,6 +13,7 @@
 ### Task 1: Initialize repository metadata and toolchain
 
 **Files:**
+
 - Create: `package.json`
 - Create: `tsconfig.json`
 - Create: `tsconfig.build.json`
@@ -45,6 +46,7 @@ Run: `git add package.json package-lock.json tsconfig.json tsconfig.build.json .
 ### Task 2: Add the minimal working CLI vertical slice
 
 **Files:**
+
 - Create: `src/cli.ts`
 - Create: `src/index.ts`
 - Create: `src/core/errors.ts`
@@ -66,6 +68,7 @@ Expected: tests fail because implementation files do not exist yet.
 **Step 3: Implement the smallest honest CLI**
 
 Add commands that actually work on macOS:
+
 - `mac-agent doctor`
 - `mac-agent permissions`
 - `mac-agent app focus <name>`
@@ -84,6 +87,7 @@ Run: `git add src tests && git commit -m "feat: add initial macOS CLI controls"`
 ### Task 3: Add project documentation and contributor-facing polish
 
 **Files:**
+
 - Create: `README.md`
 - Create: `LICENSE`
 - Create: `.github/workflows/ci.yml`
@@ -111,6 +115,7 @@ Run: `git add README.md LICENSE .github && git commit -m "docs: add open source 
 ### Task 4: Prepare remote publication
 
 **Files:**
+
 - Modify: `README.md`
 
 **Step 1: Check GitHub CLI auth state**

@@ -7,7 +7,9 @@ export class MacAgentError extends Error {
 
 export class UnsupportedPlatformError extends MacAgentError {
   constructor(platform: NodeJS.Platform) {
-    super(`mac-agent currently supports macOS only. Received platform: ${platform}`);
+    super(
+      `mac-agent currently supports macOS only. Received platform: ${platform}`,
+    );
     this.name = 'UnsupportedPlatformError';
   }
 }
@@ -19,7 +21,11 @@ export class CommandExecutionError extends MacAgentError {
 
   readonly stderr: string;
 
-  constructor(options: { command: string; exitCode: number | null; stderr: string }) {
+  constructor(options: {
+    command: string;
+    exitCode: number | null;
+    stderr: string;
+  }) {
     const detail = options.stderr.trim();
     const suffix = detail.length > 0 ? ` ${detail}` : '';
     super(`Command failed: ${options.command}.${suffix}`);
