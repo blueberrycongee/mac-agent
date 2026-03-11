@@ -5,6 +5,7 @@
   "type": "module",
   "private": false,
   "license": "MIT",
+  "main": "./dist/index.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/blueberrycongee/mac-agent.git"
@@ -26,6 +27,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
     "dev": "tsx src/cli.ts",
     "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format": "prettier --check .",
